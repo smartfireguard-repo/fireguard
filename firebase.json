@@ -1,0 +1,39 @@
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "smart-fireguard",
+          "appId": "1:43511634572:android:e432f9a50be7f183e5b9a9",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "smart-fireguard",
+          "configurations": {
+            "android": "1:43511634572:android:e432f9a50be7f183e5b9a9",
+            "ios": "1:43511634572:ios:aa8e351166979791e5b9a9",
+            "web": "1:43511634572:web:5af581e4c22a3925e5b9a9"
+          }
+        }
+      }
+    }
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ],
+      "predeploy": [
+        "npm --prefix \"$RESOURCE_DIR\" run lint"
+      ]
+    }
+  ]
+}

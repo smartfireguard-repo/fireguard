@@ -1,0 +1,55 @@
+name: smart_fireguard
+description: "A new Flutter project."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.8.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Firebase Core + Auth + Realtime DB
+  
+  firebase_auth: ^4.17.4
+  firebase_database: ^10.4.5
+
+  # FCM notifications
+  firebase_core: ^2.30.0
+  firebase_messaging: ^14.7.9
+  flutter_local_notifications: ^17.1.0
+
+  # Useful utilities
+  http: ^0.13.6
+  cupertino_icons: ^1.0.8
+  connectivity_plus: ^5.0.2
+  webview_flutter: ^4.2.2
+  google_maps_flutter: ^2.5.0
+  intl: ^0.19.0
+  url_launcher: any  # 🔧 You had this without a version, which is okay, but may cause pub warnings
+  provider: ^6.1.2
+  shared_preferences: ^2.5.3
+  mobile_scanner: ^5.2.1
+  permission_handler: ^11.3.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/logo.png 
+    - assets/bg.jpg
+    - android/app/src/main/res/raw/firealarm.mp3
+    - android/app/src/main/res/raw/flameAlarm.mp3
+    - android/app/src/main/res/raw/smokeAlarm.mp3
+  fonts:
+    - family: RobotoMono
+      fonts:
+        - asset: fonts/RobotoMono-Regular.ttf
+        - asset: fonts/RobotoMono-Bold.ttf
+          weight: 700

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "43511634572",
+    "project_id": "smart-fireguard",
+    "storage_bucket": "smart-fireguard.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:43511634572:android:e432f9a50be7f183e5b9a9",
+        "android_client_info": {
+          "package_name": "com.example.smart_fireguard"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCTiiZB_NJ63NxhGDXbaZbLiOLI3Gh_8Fc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
