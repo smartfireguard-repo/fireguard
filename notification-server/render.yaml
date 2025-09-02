@@ -1,0 +1,14 @@
+services:
+     - type: web
+       name: notification-server
+       env: node
+       plan: free
+       buildCommand: npm install
+       startCommand: npm start
+       envVars:
+         - key: NODE_ENV
+           value: production
+         - key: FIREBASE_SERVICE_ACCOUNT
+           sync: false
+         - key: FIREBASE_DATABASE_URL
+           sync: false
