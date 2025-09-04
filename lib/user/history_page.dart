@@ -5,7 +5,6 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
-import '../utils/notification_helper.dart';
 import '../providers/history_provider.dart';
 import '../models/notification_type.dart';
 
@@ -17,44 +16,36 @@ class HistoryPage extends StatefulWidget {
 }
 
 class _HistoryPageState extends State<HistoryPage> {
-  // Filter and delete mode
   String? _filterType;
   DateTime? _filterDate;
   bool _deleteMode = false;
   final Set<int> _selectedForDelete = {};
   bool _sortAscending = false;
 
-  // Firebase references and streams
-  DatabaseReference? _deviceRef;
   Query? _logsRef;
-  Stream<DatabaseEvent>? _deviceStream;
-
-  // Flag for initial device data load to prevent stale notifications
-  bool _isInitialDeviceLoad = true;
-
-  // Real-time status timer
-  Timer? _realtimeMonitorTimer;
-
-  // Connectivity state
   bool _isLoading = true;
   bool _isOnline = true;
   bool _isConnecting = false;
-
-  // Rate limiting for SnackBars
   DateTime? _lastSnackBarTime;
+  double? _parseDouble(dynamic value) {
+  if (value == null) return null;
+  try {
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value);
+  } catch (_) {
+    return null;
+  }
+  return null;
+}
 
-  // Rate limiting for saving notifications
-  String? _lastNotificationType;
-  DateTime? _lastNotificationTime;
 
   @override
   void initState() {
     super.initState();
-    // Start connectivity check and data initialization
     _checkConnectivity().then((_) => _initializeData());
   }
 
-  /// Checks network connectivity status
   Future<void> _checkConnectivity() async {
     try {
       final result = await Connectivity().checkConnectivity();
@@ -74,7 +65,6 @@ class _HistoryPageState extends State<HistoryPage> {
     }
   }
 
-  /// Initializes Firebase references and user data
   Future<void> _initializeData() async {
     setState(() {
       _isLoading = true;
@@ -91,7 +81,6 @@ class _HistoryPageState extends State<HistoryPage> {
       return;
     }
 
-    // Initialize provider to load persisted data
     await historyProvider.initialize();
 
     if (historyProvider.userId != user.uid) {
@@ -121,14 +110,7 @@ class _HistoryPageState extends State<HistoryPage> {
     }
 
     if (_isOnline && historyProvider.deviceId != null && historyProvider.deviceId!.isNotEmpty) {
-      _isInitialDeviceLoad = true;
-      Future.delayed(const Duration(milliseconds: 500), () {
-        if (_isOnline && mounted) {
-          _listenToDeviceData(historyProvider.deviceId!);
-          _startRealtimeMonitor();
-          setState(() => _isConnecting = false);
-        }
-      });
+      setState(() => _isConnecting = false);
     } else {
       historyProvider.updateRealtimeStatus(false);
       setState(() => _isConnecting = false);
@@ -137,24 +119,6 @@ class _HistoryPageState extends State<HistoryPage> {
     setState(() => _isLoading = false);
   }
 
-  /// Starts monitoring real-time status
-  void _startRealtimeMonitor() {
-    final historyProvider = Provider.of<HistoryProvider>(context, listen: false);
-    _realtimeMonitorTimer?.cancel();
-    _realtimeMonitorTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      final shouldBeActive = _isOnline &&
-          historyProvider.lastRealtimeReceived != null &&
-          DateTime.now().difference(historyProvider.lastRealtimeReceived!).inSeconds <= 5;
-      if (historyProvider.isRealtimeActive != shouldBeActive) {
-        historyProvider.updateRealtimeStatus(shouldBeActive);
-        setState(() {
-          _isConnecting = !shouldBeActive && _isOnline;
-        });
-      }
-    });
-  }
-
-  /// Fetches notification logs with filters
   Future<void> _fetchNotificationLogs() async {
     final historyProvider = Provider.of<HistoryProvider>(context, listen: false);
     final user = FirebaseAuth.instance.currentUser;
@@ -208,174 +172,6 @@ class _HistoryPageState extends State<HistoryPage> {
     }
   }
 
-  /// Listens to real-time device data
-  void _listenToDeviceData(String deviceId) {
-    final historyProvider = Provider.of<HistoryProvider>(context, listen: false);
-    _deviceRef = FirebaseDatabase.instance.ref('device_ids/$deviceId');
-    _deviceStream = _deviceRef!.onValue;
-    _deviceStream!.listen((event) {
-      final data = event.snapshot.value as Map?;
-      print('Received device data: $data');
-      if (data != null) {
-        bool changed = !_isInitialDeviceLoad;
-        _isInitialDeviceLoad = false;
-        historyProvider.updateDeviceData(Map<String, dynamic>.from(data), changed: changed);
-        if (changed) {
-          _processNotification(Map<String, dynamic>.from(data));
-        }
-      } else {
-        historyProvider.clearDeviceData();
-        historyProvider.updateRealtimeStatus(false);
-        setState(() => _isConnecting = _isOnline);
-      }
-    }, onError: (error) {
-      print('Device data error: $error');
-      _showSnackBar('Failed to fetch device data: $error');
-      historyProvider.clearDeviceData();
-      historyProvider.updateRealtimeStatus(false);
-      setState(() => _isConnecting = _isOnline);
-    });
-  }
-
-  /// Processes and saves notifications using fuzzy logic with rate-limiting
-  void _processNotification(Map<String, dynamic> data) {
-    final historyProvider = Provider.of<HistoryProvider>(context, listen: false);
-    final double? temp = _parseDouble(data['temperature']);
-    final double? smoke = _parseDouble(data['smoke']);
-    final bool flame = (data['flame'] == 1 || data['flame']?.toString() == '1' || data['flame'] == true);
-    final now = DateTime.now();
-    print('Parsed data: temp=$temp, smoke=$smoke, flame=$flame');
-    final fuzzyTemp = _fuzzifyTemp(temp ?? 0);
-    final fuzzySmoke = _fuzzifySmoke(smoke ?? 0);
-    print('Fuzzy values: temp=$fuzzyTemp, smoke=$fuzzySmoke');
-
-    String? notifType = _determineNotificationType(fuzzyTemp, fuzzySmoke, flame);
-    print('Notification type: $notifType');
-
-    if (notifType == null) return;
-
-    // Rate-limiting: Skip if same type and within 10 seconds
-    if (_lastNotificationType == notifType &&
-    _lastNotificationTime != null &&
-    now.difference(_lastNotificationTime!).inSeconds < 10 &&
-    notifType != NotificationType.emergency.value) {
-    print('Skipping $notifType notification due to 10-second rate limit');
-    return;
-  }
-
-    final notif = {
-      'type': notifType,
-      'date': _nowDate(),
-      'time': _nowTime(),
-      'smoke': smoke != null ? '${smoke.toStringAsFixed(1)}' : '-',
-      'temperature': temp != null ? '${temp.toStringAsFixed(1)}°C' : '-',
-      'flame': flame ? 'YES' : 'NO',
-      'emergency': notifType == NotificationType.emergency.value ? 'true' : 'false',
-      'timestamp': now.millisecondsSinceEpoch,
-    };
-    print('Creating notification: $notif');
-
-    // Update rate-limiting state
-    _lastNotificationType = notifType;
-    _lastNotificationTime = now;
-
-    if (historyProvider.userId != null) {
-    final ref = FirebaseDatabase.instance.ref('user_logs/${historyProvider.userId}').push();
-    print('Saving notification to Firebase: $notif');
-    ref.set(notif).then((_) {
-      print('Notification saved successfully: $notif');
-    }).catchError((error) {
-      print('Failed to save notification: $error');
-      _showSnackBar('Failed to save notification: $error');
-    });
-  }
-
-    // Show notification using NotificationHelper
-    NotificationHelper.showCustomNotification(notifType);
-  }
-
-  /// Determines notification type using fuzzy logic
-  String? _determineNotificationType(
-  Map<String, double> fuzzyTemp,
-  Map<String, double> fuzzySmoke,
-  bool flame,
-) {
-  if (flame) {
-    return NotificationType.flameDetected.value;
-  }
-  if ((fuzzySmoke['Smoky'] ?? 0) >= 0.7 && (fuzzyTemp['High'] ?? 0) >= 0.7) {
-    return NotificationType.emergency.value;
-  }
-  if ((fuzzySmoke['Smoky'] ?? 0) >= 0.7) {
-    return NotificationType.smokeDetected.value;
-  }
-  return null;
-}
-
-  /// Fuzzy logic for temperature
-  Map<String, double> _fuzzifyTemp(double temp) {
-    double low = 0, med = 0, high = 0;
-    if (temp <= 25) low = 1;
-    else if (temp > 25 && temp < 30) low = (30 - temp) / 5;
-    if (temp >= 25 && temp <= 45) med = (temp <= 35) ? (temp - 25) / 10 : (45 - temp) / 10;
-    if (temp >= 35) high = (temp >= 55) ? 1 : (temp - 35) / 20;
-    return {
-      'Low': low.clamp(0, 1),
-      'Medium': med.clamp(0, 1),
-      'High': high.clamp(0, 1),
-    };
-  }
-
-  /// Fuzzy logic for smoke
-  Map<String, double> _fuzzifySmoke(double smoke) {
-    double clean = 0, mod = 0, smoky = 0;
-
-    // Clean: Full membership (1) at smoke <= 200, linear decrease to 0 from 200 to 300
-    if (smoke <= 200) clean = 1;
-    else if (smoke > 200 && smoke < 300) clean = (300 - smoke) / 100;
-
-    // Moderate: 0 at smoke <= 200, linear increase to 1 from 200 to 300,
-    // 1 from 300 to 400, linear decrease to 0 from 400 to 500
-    if (smoke >= 200 && smoke <= 300) mod = (smoke - 200) / 100;
-    else if (smoke > 300 && smoke <= 400) mod = 1;
-    else if (smoke > 400 && smoke <= 500) mod = (500 - smoke) / 100;
-
-    // Smoky: 0 at smoke <= 400, linear increase to 1 from 400 to 500, 1 at smoke >= 500
-    if (smoke > 400 && smoke <= 500) smoky = (smoke - 400) / 100;
-    else if (smoke > 500) smoky = 1;
-
-    return {
-      'Clean': clean.clamp(0, 1),
-      'Moderate': mod.clamp(0, 1),
-      'Smoky': smoky.clamp(0, 1),
-    };
-  }
-
-  /// Parses dynamic value to double
-  double? _parseDouble(dynamic val) {
-    if (val == null) return null;
-    if (val is double) return val;
-    if (val is int) return val.toDouble();
-    return double.tryParse(val.toString());
-  }
-
-  /// Formats current date as MMDDYYYY
-  String _nowDate() {
-    final now = DateTime.now();
-    return '${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}${now.year}';
-  }
-
-  /// Formats current time as HH:MM AM/PM
-  String _nowTime() {
-    final now = DateTime.now();
-    int hour = now.hour;
-    final ampm = hour >= 12 ? 'PM' : 'AM';
-    hour = hour % 12 == 0 ? 12 : hour % 12;
-    final minute = now.minute.toString().padLeft(2, '0');
-    return '$hour:$minute $ampm';
-  }
-
-  /// Shows a rate-limited SnackBar
   void _showSnackBar(String message, {SnackBarAction? action}) {
     final now = DateTime.now();
     if (_lastSnackBarTime == null || now.difference(_lastSnackBarTime!).inSeconds > 5) {
@@ -391,7 +187,6 @@ class _HistoryPageState extends State<HistoryPage> {
     }
   }
 
-  /// Selects all filtered notifications
   void _selectAllNotifications() {
     final historyProvider = Provider.of<HistoryProvider>(context, listen: false);
     final filtered = historyProvider.notifications.where((item) {
@@ -420,7 +215,6 @@ class _HistoryPageState extends State<HistoryPage> {
     });
   }
 
-  /// Deletes selected notification logs
   Future<void> _deleteSelectedLogs() async {
     final historyProvider = Provider.of<HistoryProvider>(context, listen: false);
     if (historyProvider.userId == null) {
@@ -506,7 +300,6 @@ class _HistoryPageState extends State<HistoryPage> {
     _showSnackBar('Selected notifications deleted');
   }
 
-  /// Shows an optimized filter dialog
   void _showFilterDialog() async {
     String? selectedType = _filterType;
     DateTime? selectedDate = _filterDate;
@@ -666,7 +459,6 @@ class _HistoryPageState extends State<HistoryPage> {
     }
   }
 
-  /// Builds splash screen
   Widget _buildSplashScreen() {
     return Container(
       color: Colors.white,
@@ -692,9 +484,7 @@ class _HistoryPageState extends State<HistoryPage> {
     );
   }
 
-  /// Builds live sensor data card
   Widget _buildLiveSensorCard(HistoryProvider historyProvider) {
-    // Safely access deviceData with defaults
     final deviceData = historyProvider.deviceData;
     String tempValue = '-';
     String smokeValue = '-';
@@ -705,20 +495,16 @@ class _HistoryPageState extends State<HistoryPage> {
       smokeValue = 'N/A';
       flameValue = 'N/A';
     } else if (historyProvider.isRealtimeActive && deviceData != null) {
-      // Handle temperature
       final tempRaw = deviceData['temperature'];
       tempValue = _parseDouble(tempRaw)?.toStringAsFixed(1) ?? '-';
       if (tempValue != '-') tempValue += '°C';
 
-      // Handle smoke
       final smokeRaw = deviceData['smoke'];
       smokeValue = _parseDouble(smokeRaw)?.toStringAsFixed(1) ?? '-';
 
-      // Handle flame
       final flameRaw = deviceData['flame'];
       flameValue = (flameRaw == 1 || flameRaw?.toString() == '1' || flameRaw == true) ? 'YES' : 'NO';
     } else if (deviceData != null) {
-      // Use persisted data when not active
       final tempRaw = deviceData['temperature'];
       tempValue = _parseDouble(tempRaw)?.toStringAsFixed(1) ?? '-';
       if (tempValue != '-') tempValue += '°C';
@@ -788,7 +574,6 @@ class _HistoryPageState extends State<HistoryPage> {
     );
   }
 
-  /// Builds history cards with filtering and deletion
   Widget _buildHistoryCards() {
     final historyProvider = Provider.of<HistoryProvider>(context);
     final filtered = historyProvider.notifications.where((item) {
@@ -927,9 +712,7 @@ class _HistoryPageState extends State<HistoryPage> {
 
   @override
   void dispose() {
-    _deviceRef?.onValue.drain();
     _logsRef?.onValue.drain();
-    _realtimeMonitorTimer?.cancel();
     super.dispose();
   }
 
