@@ -1,19 +1,16 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:smart_fireguard/models/notification_type.dart';
+import 'package:smart_fireguard/providers/history_provider.dart';
 
 class NotificationHelper {
   static final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
 
-  // Store notification history with a limit
-  static final List<Map<String, String>> _notificationHistory = [];
-  static const int _maxHistorySize = 100;
-
-  // Track last notification timestamp per type for rate limiting
-  static final Map<String, DateTime> _lastNotificationTimestamps = {};
-
   static Future<void> init() async {
     try {
+      print('🔔 [Local] Initializing notifications');
       const android = AndroidInitializationSettings('@mipmap/logo');
       const settings = InitializationSettings(android: android);
       await _flutterLocalNotificationsPlugin.initialize(settings);
@@ -46,8 +43,9 @@ class NotificationHelper {
         'Channel for default alerts',
         'firealarm',
       );
-    } catch (e) {
-      print('🔔 [Local] Error initializing notifications: $e');
+      print('🔔 [Local] Notification channels created');
+    } catch (e, stackTrace) {
+      print('🔔 [Local] Error initializing notifications: $e\nStackTrace: $stackTrace');
     }
   }
 
@@ -58,6 +56,7 @@ class NotificationHelper {
     String sound,
   ) async {
     try {
+      print('🔔 [Local] Creating channel: $channelId');
       final androidChannel = AndroidNotificationChannel(
         channelId,
         channelName,
@@ -68,12 +67,16 @@ class NotificationHelper {
       await _flutterLocalNotificationsPlugin
           .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
           ?.createNotificationChannel(androidChannel);
-    } catch (e) {
-      print('🔔 [Local] Error creating channel $channelId: $e');
+      print('🔔 [Local] Channel $channelId created');
+    } catch (e, stackTrace) {
+      print('🔔 [Local] Error creating channel $channelId: $e\nStackTrace: $stackTrace');
     }
   }
 
-  static Future<void> showCustomNotification(String? title, [String? body]) async {
+  static Future<void> showCustomNotification(
+    String? title,
+    [String? body, BuildContext? context]
+  ) async {
     if (title == null || title.isEmpty) {
       print('🔔 [Local] Error: Notification title is null or empty');
       return;
@@ -120,7 +123,7 @@ class NotificationHelper {
         channelId = 'default_channel';
     }
 
-    print('🔔 Using sound: $sound for channel: $channelId');
+    print('🔔 [Local] Using sound: $sound for channel: $channelId');
 
     try {
       final androidDetails = AndroidNotificationDetails(
@@ -139,27 +142,27 @@ class NotificationHelper {
         title,
         finalBody,
         platformDetails,
+        payload: 'history',
       );
 
       _lastNotificationTimestamps[title] = now;
 
-      if (_notificationHistory.length >= _maxHistorySize) {
-        _notificationHistory.removeAt(0);
+      if (context != null) {
+        final historyProvider = Provider.of<HistoryProvider>(context, listen: false);
+        final notifications = historyProvider.notifications;
+        notifications.add({
+          'title': title,
+          'body': finalBody,
+          'timestamp': now.toIso8601String(),
+          'channelId': channelId,
+          'sound': sound,
+        });
+        await historyProvider.updateNotifications(notifications);
+        print('🔔 [Local] Saved notification to HistoryProvider');
       }
-      _notificationHistory.add({
-        'title': title,
-        'body': finalBody,
-        'timestamp': DateTime.now().toIso8601String(),
-        'channelId': channelId,
-        'sound': sound,
-      });
-    } catch (e) {
-      print('🔔 [Local] Error showing notification: $e');
+    } catch (e, stackTrace) {
+      print('🔔 [Local] Error showing notification: $e\nStackTrace: $stackTrace');
     }
-  }
-
-  static List<Map<String, String>> getNotificationHistory() {
-    return List.unmodifiable(_notificationHistory);
   }
 
   static Future<void> testNotifications() async {
@@ -172,4 +175,6 @@ class NotificationHelper {
     await Future.delayed(const Duration(seconds: 2));
     await showCustomNotification(NotificationType.defaultNotification.value, 'Test default');
   }
+
+  static final Map<String, DateTime> _lastNotificationTimestamps = {};
 }
