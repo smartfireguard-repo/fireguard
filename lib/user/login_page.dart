@@ -115,7 +115,7 @@ class _LoginPageState extends State<LoginPage> {
                     Image.asset('assets/logo.png', height: 120),
                     const SizedBox(height: 16),
                     const Text(
-                      'Fireguard',
+                      'Smart Fireguard',
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontFamily: 'PressStart2P',

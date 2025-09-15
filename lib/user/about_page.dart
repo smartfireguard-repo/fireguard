@@ -257,7 +257,7 @@ Fireguard is a reliable companion for those living alone, offering a simple, sma
             const SizedBox(height: 16),
             const Center(
               child: Text(
-                'Fireguard',
+                'Smart Fireguard',
                 style: TextStyle(
                   fontFamily: 'PressStart2P',
                   fontSize: 24,

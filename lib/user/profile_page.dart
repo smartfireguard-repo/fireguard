@@ -279,7 +279,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     const SizedBox(height: 16),
                     const Center(
                       child: Text(
-                        'Fireguard',
+                        'Smart Fireguard',
                         style: TextStyle(
                           fontFamily: 'PressStart2P',
                           fontSize: 24,

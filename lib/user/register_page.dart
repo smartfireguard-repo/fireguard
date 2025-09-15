@@ -14,6 +14,7 @@ class RegisterPage extends StatefulWidget {
 
 class _RegisterPageState extends State<RegisterPage> {
   final _deviceIdController = TextEditingController();
+  final _windIdController = TextEditingController();
   final _fullnameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -25,6 +26,7 @@ class _RegisterPageState extends State<RegisterPage> {
   String? _error;
   bool _showPassword = false;
   bool _showConfirmPassword = false;
+  bool _termsAccepted = false;
 
   @override
   void initState() {
@@ -67,6 +69,22 @@ class _RegisterPageState extends State<RegisterPage> {
     }
   }
 
+  Future<bool> _windIdExists(String windId) async {
+    try {
+      final snapshot = await FirebaseDatabase.instance
+          .ref('wind_ids/$windId')
+          .get()
+          .timeout(const Duration(seconds: 10), onTimeout: () {
+        throw TimeoutException("Wind ID check timed out");
+      });
+      print("Wind ID: $windId, Exists: ${snapshot.exists}");
+      return snapshot.exists;
+    } catch (e) {
+      print("Error checking wind ID: $e");
+      rethrow;
+    }
+  }
+
   bool _isPasswordSecure(String password) {
     final regex = RegExp(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)[A-Za-z\d]{8,}$');
     return regex.hasMatch(password);
@@ -77,16 +95,171 @@ class _RegisterPageState extends State<RegisterPage> {
     return regex.hasMatch(email);
   }
 
-  Future<void> _scanQRCode() async {
+  Future<void> _scanQRCode(String field) async {
     final scannedCode = await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const QRScanner()),
     );
     if (scannedCode != null && mounted) {
       setState(() {
-        _deviceIdController.text = scannedCode.toString().trim();
+        if (field == 'deviceId') {
+          _deviceIdController.text = scannedCode.toString().trim();
+        } else if (field == 'windId') {
+          _windIdController.text = scannedCode.toString().trim();
+        }
       });
     }
+  }
+
+  void _showTermsAndConditions() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text(
+          'Terms and Conditions',
+          style: TextStyle(
+            fontFamily: 'PressStart2P',
+            fontSize: 18,
+            color: Color(0xFFE53935),
+          ),
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                '''
+Welcome to FireGuard! By using our application, you agree to the following terms and conditions:
+
+1. **User Responsibilities**: You are responsible for maintaining the confidentiality of your account and password. You agree to provide accurate and complete information during registration.
+
+2. **Device and Wind ID Usage**: You must provide valid Device and Wind IDs that are registered in our system. Unauthorized use of IDs is prohibited.
+
+3. **Data Privacy**: We collect and store your personal information (e.g., name, email, contact number, and address embed link) securely in our database. We will not share your information without your consent, except as required by law.
+
+4. **Service Availability**: FireGuard strives to provide reliable service, but we are not liable for any interruptions or errors in the application.
+
+5. **Termination**: We reserve the right to terminate or suspend your account if you violate these terms.
+
+By accepting these terms, you acknowledge that you have read, understood, and agree to be bound by them.
+                ''',
+                style: TextStyle(
+                  fontFamily: 'PressStart2P',
+                  fontSize: 12,
+                  color: Colors.black87,
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(
+                fontFamily: 'PressStart2P',
+                fontSize: 14,
+                color: Color(0xFFE53935),
+              ),
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFE53935),
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              setState(() {
+                _termsAccepted = true;
+              });
+              Navigator.pop(context);
+            },
+            child: const Text(
+              'Accept',
+              style: TextStyle(
+                fontFamily: 'PressStart2P',
+                fontSize: 14,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showEmbedLinkTutorial() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text(
+          'How to Get Google Maps Embed Link',
+          style: TextStyle(
+            fontFamily: 'PressStart2P',
+            fontSize: 18,
+            color: Color(0xFFE53935),
+          ),
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                '''
+Follow these steps to get the embed link from Google Maps:
+
+1. **Open Google Maps**:
+   - Go to https://www.google.com/maps on your browser or open the Google Maps app.
+
+2. **Search for Your Location**:
+   - Enter the address or location you want to embed in the search bar.
+   - Press Enter or click the search icon to find the location.
+
+3. **Access the Share Option**:
+   - Once the location is displayed, click on the "Share" button (usually a share icon or text link).
+
+4. **Select Embed a Map**:
+   - In the share options, select the "Embed a map" tab or option.
+   - You will see an HTML iframe code like `<iframe src="https://www.google.com/maps/embed?..."></iframe>`.
+
+5. **Copy the Embed Link**:
+   - Copy the URL inside the `src` attribute of the iframe (e.g., https://www.google.com/maps/embed?...).
+   - Paste this URL into the Google Maps Embed Link field in the registration form.
+
+6. **Verify the Link**:
+   - Ensure the link starts with "https://www.google.com/maps/embed".
+   - Test the link in a browser to confirm it displays the correct location.
+
+**Note**: The embed link must be publicly accessible and correctly formatted for FireGuard to use it.
+                ''',
+                style: TextStyle(
+                  fontFamily: 'PressStart2P',
+                  fontSize: 12,
+                  color: Colors.black87,
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFE53935),
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              'Close',
+              style: TextStyle(
+                fontFamily: 'PressStart2P',
+                fontSize: 14,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _register() async {
@@ -100,6 +273,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
     try {
       final deviceId = _deviceIdController.text.trim();
+      final windId = _windIdController.text.trim();
       print("Validating inputs...");
 
       if (!_isEmailValid(_emailController.text.trim())) {
@@ -169,6 +343,22 @@ class _RegisterPageState extends State<RegisterPage> {
         return;
       }
 
+      if (!_termsAccepted) {
+        setState(() {
+          _error = "Please accept the Terms and Conditions.";
+          _loading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Please accept the Terms and Conditions.", style: TextStyle(fontFamily: 'PressStart2P', fontSize: 16)),
+            backgroundColor: Color(0xFFD32F2F),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        print("Terms not accepted");
+        return;
+      }
+
       print("Creating user with email: ${_emailController.text.trim()}");
       final userCredential = await FirebaseAuth.instance
           .createUserWithEmailAndPassword(
@@ -214,11 +404,30 @@ class _RegisterPageState extends State<RegisterPage> {
         return;
       }
 
+      print("Checking wind ID: $windId");
+      if (!await _windIdExists(windId)) {
+        await FirebaseAuth.instance.currentUser?.delete();
+        setState(() {
+          _error = "Wind ID not found or not available.";
+          _loading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Wind ID not found or not available.", style: TextStyle(fontFamily: 'PressStart2P', fontSize: 16)),
+            backgroundColor: Color(0xFFD32F2F),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        print("Wind ID check failed: $windId");
+        return;
+      }
+
       print("Writing user data for UID: $uid");
       await FirebaseDatabase.instance
           .ref('users/$uid')
           .set({
             'deviceId': deviceId,
+            'windId': windId,
             'fullname': _fullnameController.text.trim(),
             'email': _emailController.text.trim(),
             'contact': _contactController.text.trim(),
@@ -230,8 +439,8 @@ class _RegisterPageState extends State<RegisterPage> {
 
       print("Registration successful, navigating to login");
       if (mounted) {
-        Navigator.pushReplacementNamed(context, '/login').catchError((e) 
-        { print("Navigation error: $e");
+        Navigator.pushReplacementNamed(context, '/login').catchError((e) {
+          print("Navigation error: $e");
           setState(() {
             _error = "Navigation error: $e";
             _loading = false;
@@ -340,6 +549,7 @@ class _RegisterPageState extends State<RegisterPage> {
   @override
   void dispose() {
     _deviceIdController.dispose();
+    _windIdController.dispose();
     _fullnameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
@@ -412,7 +622,7 @@ class _RegisterPageState extends State<RegisterPage> {
                       const SizedBox(height: 16),
                       const Center(
                         child: Text(
-                          'FireGuard',
+                          'Smart Fireguard',
                           style: TextStyle(
                             fontFamily: 'PressStart2P',
                             fontSize: 24,
@@ -457,7 +667,42 @@ class _RegisterPageState extends State<RegisterPage> {
                                   prefixIcon: const Icon(Icons.devices, color: Color(0xFFE53935)),
                                   suffixIcon: IconButton(
                                     icon: const Icon(Icons.camera_alt, color: Color(0xFFE53935)),
-                                    onPressed: _loading ? null : _scanQRCode,
+                                    onPressed: _loading ? null : () => _scanQRCode('deviceId'),
+                                  ),
+                                  filled: true,
+                                  fillColor: const Color(0xFFE6F4EA),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: const BorderSide(color: Color(0xFFE53935), width: 1),
+                                  ),
+                                  focusedBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: const BorderSide(color: Color(0xFFE53935), width: 2),
+                                  ),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                ),
+                                style: const TextStyle(
+                                  color: Colors.black87,
+                                  fontFamily: 'PressStart2P',
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              TextField(
+                                controller: _windIdController,
+                                decoration: InputDecoration(
+                                  labelText: 'Wind ID',
+                                  labelStyle: const TextStyle(
+                                    color: Colors.black87,
+                                    fontFamily: 'PressStart2P',
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  prefixIcon: const Icon(Icons.air, color: Color(0xFFE53935)),
+                                  suffixIcon: IconButton(
+                                    icon: const Icon(Icons.camera_alt, color: Color(0xFFE53935)),
+                                    onPressed: _loading ? null : () => _scanQRCode('windId'),
                                   ),
                                   filled: true,
                                   fillColor: const Color(0xFFE6F4EA),
@@ -693,6 +938,10 @@ class _RegisterPageState extends State<RegisterPage> {
                                     fontWeight: FontWeight.bold,
                                   ),
                                   prefixIcon: const Icon(Icons.location_on, color: Color(0xFFE53935)),
+                                  suffixIcon: IconButton(
+                                    icon: const Icon(Icons.help_outline, color: Color(0xFFE53935), size: 20),
+                                    onPressed: _loading ? null : _showEmbedLinkTutorial,
+                                  ),
                                   filled: true,
                                   fillColor: const Color(0xFFE6F4EA),
                                   enabledBorder: OutlineInputBorder(
@@ -711,6 +960,39 @@ class _RegisterPageState extends State<RegisterPage> {
                                   fontSize: 14,
                                   fontWeight: FontWeight.w600,
                                 ),
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  Checkbox(
+                                    value: _termsAccepted,
+                                    onChanged: _loading
+                                        ? null
+                                        : (value) {
+                                            if (value == true) {
+                                              _showTermsAndConditions();
+                                            } else {
+                                              setState(() {
+                                                _termsAccepted = false;
+                                              });
+                                            }
+                                          },
+                                    activeColor: const Color(0xFFE53935),
+                                  ),
+                                  Expanded(
+                                    child: GestureDetector(
+                                      onTap: _loading ? null : _showTermsAndConditions,
+                                      child: const Text(
+                                        'I agree to the Terms and Conditions',
+                                        style: TextStyle(
+                                          fontFamily: 'PressStart2P',
+                                          fontSize: 14,
+                                          color: Color(0xFFE53935),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                               if (_error != null) ...[
                                 const SizedBox(height: 12),

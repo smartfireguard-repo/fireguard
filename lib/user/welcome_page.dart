@@ -70,7 +70,7 @@ class _WelcomePageState extends State<WelcomePage> {
                   ),
                   const SizedBox(height: 16),
                   const Text(
-                    'Fireguard',
+                    'Smart Fireguard',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontFamily: 'PressStart2P',
