@@ -28,7 +28,7 @@ import 'models/notification_type.dart';
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   try {
-    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+    await _initializeFirebase();
     print('🔔 [Background] Received FCM: ${message.toMap()}');
     
     final title = message.notification?.title ?? 'FireGuard Alert';
@@ -37,29 +37,32 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     // Show notification
     await NotificationHelper.showCustomNotification(title, body);
 
-    // Save to HistoryProvider
-    final historyProvider = HistoryProvider();
-    await historyProvider.initialize();
-    final notifications = historyProvider.notifications;
-    notifications.add({
-      'title': title,
-      'body': body,
-      'timestamp': DateTime.now().toIso8601String(),
-      'channelId': title == 'FLAME DETECTED'
-          ? 'flame_channel'
-          : title == 'SMOKE DETECTED'
-              ? 'smoke_channel'
-              : title == 'EMERGENCY'
-                  ? 'emergency_channel'
-                  : 'default_channel',
-      'sound': title == 'FLAME DETECTED'
-          ? 'flamealarm'
-          : title == 'SMOKE DETECTED'
-              ? 'smokealarm'
-              : 'firealarm',
-    });
-    await historyProvider.updateNotifications(notifications);
-    print('🔔 [Background] Saved FCM notification to HistoryProvider');
+    // Save to user_logs
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getString('userId');
+    if (userId != null) {
+      final ref = FirebaseDatabase.instance.ref('user_logs/$userId').push();
+      await ref.set({
+        'title': title,
+        'body': body,
+        'timestamp': DateTime.now().toIso8601String(),
+        'channelId': title == 'FLAME DETECTED'
+            ? 'flame_channel'
+            : title == 'SMOKE DETECTED'
+                ? 'smoke_channel'
+                : title == 'EMERGENCY'
+                    ? 'emergency_channel'
+                    : 'default_channel',
+        'sound': title == 'FLAME DETECTED'
+            ? 'flamealarm'
+            : title == 'SMOKE DETECTED'
+                ? 'smokealarm'
+                : 'firealarm',
+      });
+      print('🔔 [Background] Saved FCM notification to user_logs');
+    } else {
+      print('🔔 [Background] No userId, cannot save FCM notification');
+    }
   } catch (e, stackTrace) {
     print('🔔 [Background] FCM Error: $e\nStackTrace: $stackTrace');
   }
@@ -77,6 +80,7 @@ Future<void> initializeBackgroundService() async {
       autoStart: true,
       autoStartOnBoot: true,
       isForegroundMode: true,
+      foregroundServiceTypes: [AndroidForegroundType.dataSync],
     ),
     iosConfiguration: IosConfiguration(
       autoStart: true,
@@ -86,6 +90,7 @@ Future<void> initializeBackgroundService() async {
   );
 
   await service.startService();
+  print('🔄 [Main] Background service started');
 }
 
 @pragma('vm:entry-point')
@@ -93,87 +98,88 @@ void onStart(ServiceInstance service) async {
   DartPluginRegistrant.ensureInitialized();
 
   try {
-    // Initialize Firebase
-    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+    // Initialize Firebase with retry
+    await _initializeFirebase();
     print('🔄 [Background] Firebase initialized');
 
-    // Initialize SharedPreferences and HistoryProvider
+    // Initialize SharedPreferences
     final prefs = await SharedPreferences.getInstance();
-    final historyProvider = HistoryProvider();
-    await historyProvider.initialize();
-
-    // Get user ID
     String? userId = prefs.getString('userId');
     String? deviceId = prefs.getString('deviceId');
     print('🔄 [Background] UserID: $userId, DeviceID: $deviceId');
 
-    // Rate-limiting state
-    String? lastNotificationType;
-    DateTime? lastNotificationTime;
+    // If no userId or deviceId, try to fetch from FirebaseAuth
+    if (userId == null || deviceId == null) {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        userId = user.uid;
+        final snapshot = await FirebaseDatabase.instance
+            .ref('users/$userId')
+            .get();
+        if (snapshot.exists) {
+          final data = snapshot.value as Map<dynamic, dynamic>?;
+          deviceId = data?['deviceId']?.toString() ?? '';
+          await prefs.setString('userId', userId);
+          await prefs.setString('deviceId', deviceId);
+          print('🔄 [Background] Fetched from Firebase: UserID: $userId, DeviceID: $deviceId');
+        } else {
+          print('🔄 [Background] No user data in Firebase');
+          return;
+        }
+      } else {
+        print('🔄 [Background] No authenticated user');
+        return;
+      }
+    }
 
     // Monitor RTDB if user and device are available
     if (userId != null && deviceId != null && deviceId.isNotEmpty) {
       DatabaseReference deviceRef = FirebaseDatabase.instance.ref('device_ids/$deviceId');
+      print('🔄 [Background] Setting up listener for device_ids/$deviceId');
       deviceRef.onValue.listen((event) async {
         try {
           final data = event.snapshot.value as Map?;
           print('🔄 [Background] Received device data: $data');
           if (data != null) {
-            // Update HistoryProvider
-            historyProvider.updateDeviceData(Map<String, dynamic>.from(data), changed: true);
-
             // Process notification using fuzzy logic
-            final double? temp = _parseDouble(data['temperature']);
-            final double? smoke = _parseDouble(data['smoke']);
-            final bool flame = (data['flame'] == 1 || data['flame']?.toString() == '1' || data['flame'] == true);
+            final double? temp = _parseDouble(data['temperature'] ?? data['temp']);
+            final double? smoke = _parseDouble(data['smoke'] ?? data['smokeLevel']);
+            final bool flame = (data['flame'] == 1 ||
+                data['flame']?.toString() == '1' ||
+                data['flame'] == true ||
+                data['flame']?.toString().toLowerCase() == 'yes');
             final now = DateTime.now();
 
             final fuzzyTemp = _fuzzifyTemp(temp ?? 0);
             final fuzzySmoke = _fuzzifySmoke(smoke ?? 0);
             final notifType = _determineNotificationType(fuzzyTemp, fuzzySmoke, flame);
 
-            if (notifType == null) return;
-
-            // Rate-limiting: Skip if same type and within 10 seconds
-            if (lastNotificationType == notifType &&
-              lastNotificationTime != null &&
-              now.difference(lastNotificationTime!).inSeconds < 10 && // <-- add !
-              notifType != NotificationType.emergency.value) {
-            print('🔄 [Background] Skipping $notifType notification due to 10-second rate limit');
-            return;
-          }
-
+            if (notifType == null) {
+              print('🔄 [Background] No notification triggered for data: $data');
+              return;
+            }
 
             // Create notification
             final notif = {
               'type': notifType,
               'date': _nowDate(),
               'time': _nowTime(),
-              'smoke': smoke != null ? '${smoke.toStringAsFixed(1)}' : '-',
-              'temperature': temp != null ? '${temp.toStringAsFixed(1)}°C' : '-',
+              'smoke': smoke != null ? '${smoke.toStringAsFixed(1)}' : 'N/A',
+              'temperature': temp != null ? '${temp.toStringAsFixed(1)}°C' : 'N/A',
               'flame': flame ? 'YES' : 'NO',
               'emergency': notifType == NotificationType.emergency.value ? 'true' : 'false',
               'timestamp': now.millisecondsSinceEpoch,
             };
             print('🔄 [Background] Creating notification: $notif');
 
-            // Update rate-limiting state
-            lastNotificationType = notifType;
-            lastNotificationTime = now;
-
             // Save to RTDB
             final ref = FirebaseDatabase.instance.ref('user_logs/$userId').push();
             await ref.set(notif);
             print('🔄 [Background] Notification saved to RTDB');
 
-            // Save to HistoryProvider
-            final notifications = historyProvider.notifications;
-            notifications.add(notif);
-            await historyProvider.updateNotifications(notifications);
-            print('🔄 [Background] Notification saved to HistoryProvider');
-
             // Show notification
             await NotificationHelper.showCustomNotification(notifType);
+            print('🔄 [Background] Notification displayed: $notifType');
           } else {
             print('🔄 [Background] No device data');
           }
@@ -183,6 +189,8 @@ void onStart(ServiceInstance service) async {
       }, onError: (error) {
         print('🔄 [Background] Device data error: $error');
       });
+    } else {
+      print('🔄 [Background] Cannot set up listener: userId=$userId, deviceId=$deviceId');
     }
 
     // Set as foreground service
@@ -194,6 +202,7 @@ void onStart(ServiceInstance service) async {
         title: 'FireGuard Service',
         content: 'Monitoring device status...',
       );
+      print('🔄 [Background] Foreground service set');
     }
 
     // Stop handler
@@ -212,6 +221,24 @@ void onStart(ServiceInstance service) async {
     });
   } catch (e, stackTrace) {
     print('🔄 [Background] Error: $e\nStackTrace: $stackTrace');
+  }
+}
+
+/// ---------------------------------------------
+/// Helper to initialize Firebase with retry
+/// ---------------------------------------------
+Future<void> _initializeFirebase() async {
+  const maxRetries = 3;
+  for (var attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+      print('🔄 [Background] Firebase initialized successfully');
+      return;
+    } catch (e) {
+      print('🔄 [Background] Firebase init attempt $attempt failed: $e');
+      if (attempt == maxRetries) rethrow;
+      await Future.delayed(const Duration(seconds: 2));
+    }
   }
 }
 
@@ -252,11 +279,11 @@ String? _determineNotificationType(
     Map<String, double> fuzzySmoke,
     bool flame,
 ) {
-  if (flame) {
-    return NotificationType.flameDetected.value;
-  }
   if ((fuzzySmoke['Smoky'] ?? 0) >= 0.7 && (fuzzyTemp['High'] ?? 0) >= 0.7) {
     return NotificationType.emergency.value;
+  }
+  if (flame) {
+    return NotificationType.flameDetected.value;
   }
   if ((fuzzySmoke['Smoky'] ?? 0) >= 0.7) {
     return NotificationType.smokeDetected.value;
@@ -267,9 +294,12 @@ String? _determineNotificationType(
 // Parses dynamic value to double
 double? _parseDouble(dynamic val) {
   if (val == null) return null;
-  if (val is double) return val;
-  if (val is int) return val.toDouble();
-  return double.tryParse(val.toString());
+  if (val is num) return val.toDouble();
+  if (val is String) {
+    final cleaned = val.replaceAll(RegExp(r'[^0-9.-]'), '');
+    return double.tryParse(cleaned);
+  }
+  return null;
 }
 
 // Formats current date as MMDDYYYY
@@ -292,6 +322,7 @@ String _nowTime() {
 Future<bool> onIosBackground(ServiceInstance service) async {
   WidgetsFlutterBinding.ensureInitialized();
   DartPluginRegistrant.ensureInitialized();
+  print('🍎 [iOS Background] Running task...');
   return true;
 }
 
@@ -301,8 +332,17 @@ Future<bool> onIosBackground(ServiceInstance service) async {
 Future<void> requestBackgroundPermissions() async {
   final notificationStatus = await Permission.notification.request();
   print('🔔 Notification Permission: $notificationStatus');
+  if (notificationStatus.isDenied || notificationStatus.isPermanentlyDenied) {
+    print('🔔 Notification permission denied, opening settings');
+    await openAppSettings();
+  }
+
   final batteryStatus = await Permission.ignoreBatteryOptimizations.request();
   print('🔋 Battery Optimization Exemption: $batteryStatus');
+  if (batteryStatus.isDenied || batteryStatus.isPermanentlyDenied) {
+    print('🔋 Battery optimization exemption denied, opening settings');
+    await openAppSettings();
+  }
 }
 
 /// ---------------------------------------------
@@ -310,7 +350,7 @@ Future<void> requestBackgroundPermissions() async {
 /// ---------------------------------------------
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await _initializeFirebase();
 
   // Register FCM background handler
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
@@ -323,6 +363,20 @@ Future<void> main() async {
 
   // Start background service
   await initializeBackgroundService();
+
+  // Ensure user data is saved
+  final user = FirebaseAuth.instance.currentUser;
+  if (user != null) {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('userId', user.uid);
+    final snapshot = await FirebaseDatabase.instance.ref('users/${user.uid}').get();
+    if (snapshot.exists) {
+      final data = snapshot.value as Map<dynamic, dynamic>?;
+      final deviceId = data?['deviceId']?.toString() ?? '';
+      await prefs.setString('deviceId', deviceId);
+      print('📲 [Main] Saved userId: ${user.uid}, deviceId: $deviceId');
+    }
+  }
 
   runApp(
     ChangeNotifierProvider(
@@ -387,11 +441,13 @@ class _MyAppState extends State<MyApp> {
 
     FirebaseMessaging.onMessageOpenedApp.listen((message) {
       print('🧭 Notification tapped from background: ${message.notification?.title}');
-      Navigator.of(context).pushNamed('/history');
+      if (mounted) {
+        Navigator.of(context).pushNamed('/history');
+      }
     });
 
     final initialMessage = await messaging.getInitialMessage();
-    if (initialMessage != null) {
+    if (initialMessage != null && mounted) {
       print('🧭 App opened from terminated: ${initialMessage.notification?.title}');
       Navigator.of(context).pushNamed('/history');
     }
@@ -399,7 +455,7 @@ class _MyAppState extends State<MyApp> {
     await _flutterLocalNotificationsPlugin.initialize(
       const InitializationSettings(android: AndroidInitializationSettings('@mipmap/logo')),
       onDidReceiveNotificationResponse: (resp) {
-        if (resp.payload == 'history') {
+        if (resp.payload == 'history' && mounted) {
           Navigator.of(context).pushNamed('/history');
         }
       },
