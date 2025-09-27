@@ -23,7 +23,7 @@
 
     <application
         android:name="${applicationName}"
-        android:label="Fireguard"
+        android:label="Smart Fireguard"
         android:icon="@mipmap/logo"
         android:theme="@style/LaunchTheme"
         android:usesCleartextTraffic="true">
@@ -83,10 +83,10 @@
 
         <!-- Flutter Background Service -->
        <service
-            android:name="id.flutter.flutter_background_service.BackgroundService"
+            android:name="com.ryanheise.myapp.BackgroundService"            
             android:enabled="true"
-            android:exported="true"
-            android:foregroundServiceType="dataSync|connectedDevice" />
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
 
         <receiver
             android:name="id.flutter.flutter_background_service.BackgroundServiceBootReceiver"
