@@ -12,8 +12,8 @@ android {
 
     defaultConfig {
         applicationId = "com.example.smart_fireguard"
-        minSdk = 21
-        targetSdk = 35
+        minSdk = 23
+        targetSdk = 33
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
@@ -47,5 +47,5 @@ flutter {
 
 dependencies {
     // Add your additional dependencies here if needed
-    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }
