@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -17,29 +18,76 @@ class _ProfilePageState extends State<ProfilePage> {
 
   bool _loading = true;
   bool _editing = false;
+  bool _noInternet = false;
   String? _error;
 
   @override
   void initState() {
     super.initState();
     _fetchProfile();
+    _checkConnectivity();
+    Connectivity().onConnectivityChanged.listen((result) {
+      setState(() {
+        _noInternet = result == ConnectivityResult.none;
+      });
+    });
   }
 
   Future<void> _fetchProfile() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
-      final snapshot = await FirebaseDatabase.instance.ref('users/${user.uid}').get();
-      if (snapshot.exists) {
-        final data = snapshot.value as Map?;
-        _fullnameController.text = data?['fullname'] ?? '';
-        _emailController.text = data?['email'] ?? '';
-        _contactController.text = data?['contact'] ?? '';
-        _addressController.text = data?['address_embed_link'] ?? '';
+      try {
+        final snapshot = await FirebaseDatabase.instance.ref('users/${user.uid}').get();
+        if (snapshot.exists) {
+          final data = snapshot.value as Map?;
+          _fullnameController.text = data?['fullname'] ?? '';
+          _emailController.text = data?['email'] ?? '';
+          _contactController.text = data?['contact'] ?? '';
+          _addressController.text = data?['address_embed_link'] ?? '';
+        }
+      } catch (e) {
+        setState(() {
+          _error = 'Failed to fetch profile: $e';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Failed to fetch profile: $e',
+              style: const TextStyle(fontFamily: 'PressStart2P', fontSize: 16),
+            ),
+            backgroundColor: const Color(0xFFD32F2F),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
     }
     setState(() {
       _loading = false;
     });
+  }
+
+  Future<void> _checkConnectivity() async {
+    try {
+      final result = await Connectivity().checkConnectivity();
+      setState(() {
+        _noInternet = result == ConnectivityResult.none;
+      });
+    } catch (e) {
+      print('Error checking connectivity: $e');
+      setState(() {
+        _noInternet = true;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Error checking connectivity: $e',
+            style: const TextStyle(fontFamily: 'PressStart2P', fontSize: 16),
+          ),
+          backgroundColor: const Color(0xFFD32F2F),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   Future<void> _saveProfile() async {
@@ -225,45 +273,28 @@ class _ProfilePageState extends State<ProfilePage> {
         ),
         iconTheme: const IconThemeData(color: Colors.white),
       ),
-      backgroundColor: Colors.white,
-      body: _loading
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Image.asset(
-                    'assets/logo.png',
-                    height: 120,
-                    errorBuilder: (context, error, stackTrace) => const Text(
-                      'Logo not found',
-                      style: TextStyle(
-                        fontFamily: 'PressStart2P',
-                        fontSize: 16,
-                        color: Color(0xFFE53935),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  const CircularProgressIndicator(color: Color(0xFFE53935)),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Loading Profile...',
-                    style: TextStyle(
-                      fontFamily: 'PressStart2P',
-                      fontSize: 16,
-                      color: Color(0xFFE53935),
-                    ),
-                  ),
-                ],
-              ),
-            )
-          : SingleChildScrollView(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: [
-                    Center(
-                      child: Image.asset(
+      body: Stack(
+        children: [
+          // Background Image - fills the screen, not distorted
+          Positioned.fill(
+            child: Image.asset(
+              'assets/bg.jpg',
+              fit: BoxFit.cover,
+            ),
+          ),
+          // Semi-transparent overlay for readability
+          Positioned.fill(
+            child: Container(
+              color: Colors.black.withOpacity(0.3),
+            ),
+          ),
+          // Main Content
+          _loading
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Image.asset(
                         'assets/logo.png',
                         height: 120,
                         errorBuilder: (context, error, stackTrace) => const Text(
@@ -275,155 +306,212 @@ class _ProfilePageState extends State<ProfilePage> {
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    const Center(
-                      child: Text(
-                        'Smart Fireguard',
+                      const SizedBox(height: 16),
+                      const CircularProgressIndicator(color: Color(0xFFE53935)),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Loading Profile...',
                         style: TextStyle(
                           fontFamily: 'PressStart2P',
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFFE53935),
+                          fontSize: 16,
+                          color: Colors.white,
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    Card(
-                      color: const Color(0xFFE6F4EA),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        side: const BorderSide(color: Color(0xFF2E7D32), width: 2),
-                      ),
-                      elevation: 6,
-                      child: Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Profile Information',
-                              style: TextStyle(
-                                fontFamily: 'PressStart2P',
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFFE53935),
-                              ),
+                    ],
+                  ),
+                )
+              : Center(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Image.asset(
+                          'assets/logo.png',
+                          height: 120,
+                          errorBuilder: (context, error, stackTrace) => const Text(
+                            'Logo not found',
+                            style: TextStyle(
+                              fontFamily: 'PressStart2P',
+                              fontSize: 16,
+                              color: Color(0xFFE53935),
                             ),
-                            const SizedBox(height: 12),
-                            _ProfileField(
-                              icon: Icons.person,
-                              label: 'Full Name',
-                              controller: _fullnameController,
-                              enabled: _editing,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        const Center(
+                          child: Text(
+                            'Smart Fireguard',
+                            style: TextStyle(
+                              fontFamily: 'PressStart2P',
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
                             ),
-                            const SizedBox(height: 12),
-                            _ProfileField(
-                              icon: Icons.email,
-                              label: 'Email',
-                              controller: _emailController,
-                              enabled: false,
-                            ),
-                            const SizedBox(height: 12),
-                            _ProfileField(
-                              icon: Icons.phone,
-                              label: 'Contact Number',
-                              controller: _contactController,
-                              enabled: _editing,
-                            ),
-                            const SizedBox(height: 12),
-                            _ProfileField(
-                              icon: Icons.location_on,
-                              label: 'Google Maps Embed Link',
-                              controller: _addressController,
-                              enabled: _editing,
-                            ),
-                            if (_error != null) ...[
-                              const SizedBox(height: 12),
-                              Text(
-                                _error!,
-                                style: const TextStyle(
-                                  fontFamily: 'PressStart2P',
-                                  fontSize: 16,
-                                  color: Color(0xFFE53935),
-                                ),
-                              ),
-                            ],
-                            const SizedBox(height: 16),
-                            Row(
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Card(
+                          color: const Color(0xFFE6F4EA).withOpacity(0.9),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: const BorderSide(color: Color(0xFF2E7D32), width: 2),
+                          ),
+                          elevation: 6,
+                          child: Padding(
+                            padding: const EdgeInsets.all(20),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Expanded(
-                                  child: ElevatedButton(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: _editing ? const Color(0xFFE53935) : Colors.grey,
-                                      foregroundColor: Colors.white,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      padding: const EdgeInsets.symmetric(vertical: 16),
-                                    ),
-                                    onPressed: _loading
-                                        ? null
-                                        : () {
-                                            if (_editing) {
-                                              _saveProfile();
-                                            } else {
-                                              setState(() {
-                                                _editing = true;
-                                              });
-                                            }
-                                          },
-                                    child: Text(
-                                      _editing ? 'Save' : 'Edit',
-                                      style: const TextStyle(
-                                        fontFamily: 'PressStart2P',
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
+                                const Text(
+                                  'Profile Information',
+                                  style: TextStyle(
+                                    fontFamily: 'PressStart2P',
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFFE53935),
                                   ),
                                 ),
-                                if (_editing) ...[
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: TextButton(
-                                      style: TextButton.styleFrom(
-                                        foregroundColor: Colors.grey,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        padding: const EdgeInsets.symmetric(vertical: 16),
-                                      ),
-                                      onPressed: _loading
-                                          ? null
-                                          : () {
-                                              setState(() {
-                                                _editing = false;
-                                                _fetchProfile();
-                                              });
-                                            },
-                                      child: const Text(
-                                        'Cancel',
-                                        style: TextStyle(
-                                          fontFamily: 'PressStart2P',
-                                          fontSize: 16,
-                                          color: Colors.grey,
-                                        ),
-                                      ),
+                                const SizedBox(height: 12),
+                                _ProfileField(
+                                  icon: Icons.person,
+                                  label: 'Full Name',
+                                  controller: _fullnameController,
+                                  enabled: _editing,
+                                ),
+                                const SizedBox(height: 12),
+                                _ProfileField(
+                                  icon: Icons.email,
+                                  label: 'Email',
+                                  controller: _emailController,
+                                  enabled: false,
+                                ),
+                                const SizedBox(height: 12),
+                                _ProfileField(
+                                  icon: Icons.phone,
+                                  label: 'Contact Number',
+                                  controller: _contactController,
+                                  enabled: _editing,
+                                ),
+                                const SizedBox(height: 12),
+                                _ProfileField(
+                                  icon: Icons.location_on,
+                                  label: 'Google Maps Embed Link',
+                                  controller: _addressController,
+                                  enabled: _editing,
+                                ),
+                                if (_error != null) ...[
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    _error!,
+                                    style: const TextStyle(
+                                      fontFamily: 'PressStart2P',
+                                      fontSize: 16,
+                                      color: Color(0xFFE53935),
                                     ),
                                   ),
                                 ],
+                                const SizedBox(height: 16),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: ElevatedButton(
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: _editing ? const Color(0xFFE53935) : Colors.grey,
+                                          foregroundColor: Colors.white,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          padding: const EdgeInsets.symmetric(vertical: 16),
+                                        ),
+                                        onPressed: _loading
+                                            ? null
+                                            : () {
+                                                if (_editing) {
+                                                  _saveProfile();
+                                                } else {
+                                                  setState(() {
+                                                    _editing = true;
+                                                  });
+                                                }
+                                              },
+                                        child: Text(
+                                          _editing ? 'Save' : 'Edit',
+                                          style: const TextStyle(
+                                            fontFamily: 'PressStart2P',
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    if (_editing) ...[
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: TextButton(
+                                          style: TextButton.styleFrom(
+                                            foregroundColor: Colors.grey,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: BorderRadius.circular(8),
+                                            ),
+                                            padding: const EdgeInsets.symmetric(vertical: 16),
+                                          ),
+                                          onPressed: _loading
+                                              ? null
+                                              : () {
+                                                  setState(() {
+                                                    _editing = false;
+                                                    _fetchProfile();
+                                                  });
+                                                },
+                                          child: const Text(
+                                            'Cancel',
+                                            style: TextStyle(
+                                              fontFamily: 'PressStart2P',
+                                              fontSize: 16,
+                                              color: Colors.grey,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
                               ],
                             ),
-                          ],
+                          ),
                         ),
+                        const SizedBox(height: 16),
+                      ],
+                    ),
+                  ),
+                ),
+          // No Internet Banner
+          if (_noInternet)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: Container(
+                color: const Color(0xFFD32F2F),
+                padding: const EdgeInsets.all(12),
+                child: const SafeArea(
+                  child: Center(
+                    child: Text(
+                      'No internet connection',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontFamily: 'PressStart2P',
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                    const SizedBox(height: 16),
-                  ],
+                  ),
                 ),
               ),
             ),
+        ],
+      ),
     );
   }
 }
@@ -456,7 +544,7 @@ class _ProfileField extends StatelessWidget {
           fontWeight: FontWeight.bold,
         ),
         filled: true,
-        fillColor: const Color(0xFFE6F4EA),
+        fillColor: const Color(0xFFE6F4EA).withOpacity(0.9),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: Color(0xFFE53935), width: 1),

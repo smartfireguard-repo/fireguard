@@ -1,14 +1,28 @@
 {
   "rules": {
-    "users": {
+    "device_ids": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "user_logs": {
+      "global": {
+        ".read": "auth != null",
+        ".write": "auth != null",
+        ".indexOn": ["timestamp"]
+      },
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",
-        ".write": "auth != null && auth.uid === $uid"
+        ".write": "auth != null && auth.uid === $uid",
+        ".indexOn": ["timestamp"]
       }
     },
-    "device_ids": {
-      ".read": true,
-      ".write": true 
+    "users": {
+      ".read": "auth != null && auth.token.admin === true",
+      ".write": "auth != null && auth.token.admin === true",
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || auth.token.admin === true)",
+        ".write": "auth != null && (auth.uid === $uid || auth.token.admin === true)"
+      }
     }
   }
 }
