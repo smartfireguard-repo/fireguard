@@ -644,6 +644,7 @@ Follow these steps to get the embed link from Google Maps:
                               ),
                               const SizedBox(height: 12),
                               TextField(
+                                key: Key('device_id_field'),
                                 controller: _deviceIdController,
                                 decoration: InputDecoration(
                                   labelText: 'Device ID',
@@ -679,6 +680,7 @@ Follow these steps to get the embed link from Google Maps:
                               ),
                               const SizedBox(height: 12),
                               TextField(
+                                key: Key('wind_id_field'),
                                 controller: _windIdController,
                                 decoration: InputDecoration(
                                   labelText: 'Wind ID',
@@ -714,6 +716,7 @@ Follow these steps to get the embed link from Google Maps:
                               ),
                               const SizedBox(height: 12),
                               TextField(
+                                key: Key('full_name_field'),
                                 controller: _fullnameController,
                                 decoration: InputDecoration(
                                   labelText: 'Full Name',
@@ -745,6 +748,7 @@ Follow these steps to get the embed link from Google Maps:
                               ),
                               const SizedBox(height: 12),
                               TextField(
+                                key: Key('email_field'),
                                 controller: _emailController,
                                 decoration: InputDecoration(
                                   labelText: 'Email',
@@ -788,6 +792,7 @@ Follow these steps to get the embed link from Google Maps:
                               ],
                               const SizedBox(height: 12),
                               TextField(
+                                key: Key('password_field'),
                                 controller: _passwordController,
                                 obscureText: !_showPassword,
                                 decoration: InputDecoration(
@@ -843,6 +848,7 @@ Follow these steps to get the embed link from Google Maps:
                               ],
                               const SizedBox(height: 12),
                               TextField(
+                                key: Key('confirm_password_field'),
                                 controller: _confirmPasswordController,
                                 obscureText: !_showConfirmPassword,
                                 decoration: InputDecoration(
@@ -886,6 +892,7 @@ Follow these steps to get the embed link from Google Maps:
                               ),
                               const SizedBox(height: 12),
                               TextField(
+                                key: Key('contact_number_field'),
                                 controller: _contactController,
                                 decoration: InputDecoration(
                                   labelText: 'Contact Number',
@@ -917,6 +924,7 @@ Follow these steps to get the embed link from Google Maps:
                               ),
                               const SizedBox(height: 12),
                               TextField(
+                                key: Key('google_maps_field'),
                                 controller: _embedLinkController,
                                 decoration: InputDecoration(
                                   labelText: 'Google Maps Embed Link',
