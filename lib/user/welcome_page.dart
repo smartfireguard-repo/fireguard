@@ -15,17 +15,21 @@ class _WelcomePageState extends State<WelcomePage> {
   void initState() {
     super.initState();
     _checkConnectivity();
-    Connectivity().onConnectivityChanged.listen((result) {
+    Connectivity().onConnectivityChanged.listen((List<ConnectivityResult> result) {
+      print('Stream received: $result'); // Debug
       setState(() {
-        _noInternet = result == ConnectivityResult.none;
+        _noInternet = result.contains(ConnectivityResult.none);
+        print('Set noInternet to: $_noInternet'); // Debug
       });
     });
   }
 
   Future<void> _checkConnectivity() async {
     final result = await Connectivity().checkConnectivity();
+    print('Initial connectivity check: $result'); // Debug
     setState(() {
-      _noInternet = result == ConnectivityResult.none;
+      _noInternet = result.contains(ConnectivityResult.none);
+      print('Set noInternet to: $_noInternet'); // Debug
     });
   }
 
@@ -37,12 +41,12 @@ class _WelcomePageState extends State<WelcomePage> {
           // Background Image - fills the screen, not distorted
           Positioned.fill(
             child: Image.asset(
-              'assets/bg.jpg', // Change to your actual path
+              'assets/bg.jpg',
               fit: BoxFit.cover,
             ),
           ),
 
-          // Semi-transparent overlay for readability (optional)
+          // Semi-transparent overlay for readability
           Positioned.fill(
             child: Container(
               color: Colors.black.withOpacity(0.3),
