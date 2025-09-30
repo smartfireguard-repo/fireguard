@@ -9,7 +9,13 @@ import '../providers/history_provider.dart';
 import '../models/notification_type.dart';
 
 class HistoryPage extends StatefulWidget {
-  const HistoryPage({super.key});
+  final FirebaseAuth firebaseAuth; // Add parameter
+  final FirebaseDatabase firebaseDatabase; // Add parameter
+  const HistoryPage({
+    super.key,
+    required this.firebaseAuth,
+    required this.firebaseDatabase,
+  });
 
   @override
   State<HistoryPage> createState() => _HistoryPageState();

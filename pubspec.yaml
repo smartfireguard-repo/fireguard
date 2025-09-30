@@ -52,8 +52,11 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-    - assets/logo.png
+    - assets/logo.png 
     - assets/bg.jpg
+    - android/app/src/main/res/raw/firealarm.mp3
+    - android/app/src/main/res/raw/flamealarm.mp3
+    - android/app/src/main/res/raw/smokealarm.mp3
     - assets/firealarm.mp3
     - assets/flamealarm.mp3
     - assets/smokealarm.mp3
