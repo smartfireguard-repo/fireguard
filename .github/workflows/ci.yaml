@@ -29,7 +29,7 @@ jobs:
 
       # Generate mocks with build_runner
       - name: Generate mocks
-        run: flutter pub run build_runner build --delete-conflicting-outputs
+        run: dart run build_runner build --delete-conflicting-outputs
 
       # Run unit tests
       - name: Run unit tests
