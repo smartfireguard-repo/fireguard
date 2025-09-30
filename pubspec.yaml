@@ -52,14 +52,12 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-    - assets/logo.png 
+    - assets/logo.png
     - assets/bg.jpg
-    - android/app/src/main/res/raw/firealarm.mp3
-    - android/app/src/main/res/raw/flameAlarm.mp3
-    - android/app/src/main/res/raw/smokeAlarm.mp3
     - assets/firealarm.mp3
     - assets/flameAlarm.mp3
     - assets/smokeAlarm.mp3
+
 
   fonts:
     - family: RobotoMono
