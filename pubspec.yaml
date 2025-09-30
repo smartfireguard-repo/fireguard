@@ -55,9 +55,8 @@ flutter:
     - assets/logo.png
     - assets/bg.jpg
     - assets/firealarm.mp3
-    - assets/flameAlarm.mp3
-    - assets/smokeAlarm.mp3
-
+    - assets/flamealarm.mp3
+    - assets/smokealarm.mp3
 
   fonts:
     - family: RobotoMono
