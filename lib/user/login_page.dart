@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'history_page.dart';
-
+import 'package:firebase_database/firebase_database.dart';
 class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
+  final FirebaseAuth firebaseAuth; // Add firebaseAuth parameter
+  const LoginPage({super.key, required this.firebaseAuth});
 
   @override
   State<LoginPage> createState() => _LoginPageState();
@@ -23,13 +24,18 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
+      await widget.firebaseAuth.signInWithEmailAndPassword( // Use injected firebaseAuth
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
       if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const HistoryPage()),
+          MaterialPageRoute(
+            builder: (_) => HistoryPage(
+              firebaseAuth: FirebaseAuth.instance,
+              firebaseDatabase: FirebaseDatabase.instance,
+            ),
+          ),
           (route) => false,
         );
       }
@@ -62,7 +68,7 @@ class _LoginPageState extends State<LoginPage> {
     }
 
     try {
-      await FirebaseAuth.instance.sendPasswordResetEmail(email: email);
+      await widget.firebaseAuth.sendPasswordResetEmail(email: email); // Use injected firebaseAuth
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Password reset email sent.'),

@@ -414,11 +414,14 @@ class _MyAppState extends State<MyApp> {
       home: const AuthChecker(),
       routes: {
         '/welcome': (_) => const WelcomePage(),
-        '/login': (_) => const LoginPage(),
-        '/register': (_) => const RegisterPage(),
+        '/login': (_) => LoginPage(firebaseAuth: FirebaseAuth.instance),
+        '/register': (_) =>  RegisterPage(),
         '/profile': (_) => const ProfilePage(),
         '/about': (_) => AboutPage(),
-        '/history': (_) => const HistoryPage(),
+        '/history': (_) => HistoryPage(
+              firebaseAuth: FirebaseAuth.instance,
+              firebaseDatabase: FirebaseDatabase.instance,
+            ),
       },
     );
   }
@@ -434,7 +437,10 @@ class AuthChecker extends StatelessWidget {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
-        return snapshot.hasData ? const HistoryPage() : const WelcomePage();
+        return snapshot.hasData ?  HistoryPage(
+              firebaseAuth: FirebaseAuth.instance,
+              firebaseDatabase: FirebaseDatabase.instance,
+            ) : const WelcomePage();
       },
     );
   }

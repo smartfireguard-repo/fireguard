@@ -1,12 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'dart:async';
+import 'package:firebase_core/firebase_core.dart';
 import './widgets/qr_scanner.dart';
 
 class RegisterPage extends StatefulWidget {
-  const RegisterPage({super.key});
+  final FirebaseAuth firebaseAuth;
+  final FirebaseDatabase firebaseDatabase;
+
+  RegisterPage({
+    super.key,
+    FirebaseAuth? firebaseAuth,
+    FirebaseDatabase? firebaseDatabase,
+  })  : firebaseAuth = firebaseAuth ?? FirebaseAuth.instance,
+        firebaseDatabase = firebaseDatabase ?? FirebaseDatabase.instance;
 
   @override
   State<RegisterPage> createState() => _RegisterPageState();
@@ -31,31 +39,12 @@ class _RegisterPageState extends State<RegisterPage> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      try {
-        await Firebase.initializeApp();
-        print("Firebase initialized successfully");
-      } catch (e) {
-        print("Firebase initialization error: $e");
-        if (mounted) {
-          setState(() {
-            _error = "Failed to initialize Firebase: $e";
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text("Failed to initialize Firebase: $e", style: const TextStyle(fontFamily: 'PressStart2P', fontSize: 16)),
-              backgroundColor: const Color(0xFFD32F2F),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
-      }
-    });
+    // Removed Firebase.initializeApp() as it's handled at the app level
   }
 
   Future<bool> _deviceIdExists(String deviceId) async {
     try {
-      final snapshot = await FirebaseDatabase.instance
+      final snapshot = await widget.firebaseDatabase
           .ref('device_ids/$deviceId')
           .get()
           .timeout(const Duration(seconds: 10), onTimeout: () {
@@ -71,7 +60,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
   Future<bool> _windIdExists(String windId) async {
     try {
-      final snapshot = await FirebaseDatabase.instance
+      final snapshot = await widget.firebaseDatabase
           .ref('wind_ids/$windId')
           .get()
           .timeout(const Duration(seconds: 10), onTimeout: () {
@@ -360,7 +349,7 @@ Follow these steps to get the embed link from Google Maps:
       }
 
       print("Creating user with email: ${_emailController.text.trim()}");
-      final userCredential = await FirebaseAuth.instance
+      final userCredential = await widget.firebaseAuth
           .createUserWithEmailAndPassword(
             email: _emailController.text.trim(),
             password: _passwordController.text,
@@ -388,7 +377,7 @@ Follow these steps to get the embed link from Google Maps:
 
       print("Checking device ID: $deviceId");
       if (!await _deviceIdExists(deviceId)) {
-        await FirebaseAuth.instance.currentUser?.delete();
+        await widget.firebaseAuth.currentUser?.delete();
         setState(() {
           _error = "Device ID not found or not available.";
           _loading = false;
@@ -406,7 +395,7 @@ Follow these steps to get the embed link from Google Maps:
 
       print("Checking wind ID: $windId");
       if (!await _windIdExists(windId)) {
-        await FirebaseAuth.instance.currentUser?.delete();
+        await widget.firebaseAuth.currentUser?.delete();
         setState(() {
           _error = "Wind ID not found or not available.";
           _loading = false;
@@ -423,7 +412,7 @@ Follow these steps to get the embed link from Google Maps:
       }
 
       print("Writing user data for UID: $uid");
-      await FirebaseDatabase.instance
+      await widget.firebaseDatabase
           .ref('users/$uid')
           .set({
             'deviceId': deviceId,
