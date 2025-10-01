@@ -927,7 +927,7 @@ Follow these steps to get the embed link from Google Maps:
                                 key: Key('google_maps_field'),
                                 controller: _embedLinkController,
                                 decoration: InputDecoration(
-                                  labelText: 'Google Maps Embed Link',
+                                  labelText: 'Google Maps Embed',
                                   labelStyle: const TextStyle(
                                     color: Colors.black87,
                                     fontFamily: 'PressStart2P',
