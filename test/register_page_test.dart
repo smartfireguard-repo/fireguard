@@ -130,7 +130,7 @@ void main() {
       testWidgets('Shows error for empty Google Maps embed link', (WidgetTester tester) async {
         await setUpWidget(tester);
 
-        await tester.enterText(find.byKey(Key('device_id_field')), 'device12');
+        await tester.enterText(find.byKey(Key('device_id_field')), 'device123');
         await tester.enterText(find.byKey(Key('wind_id_field')), 'wind456');
         await tester.enterText(find.byKey(Key('full_name_field')), 'John Doe');
         await tester.enterText(find.byKey(Key('email_field')), 'test@example.com');
