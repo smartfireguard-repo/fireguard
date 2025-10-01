@@ -895,7 +895,7 @@ Follow these steps to get the embed link from Google Maps:
                                 key: Key('contact_number_field'),
                                 controller: _contactController,
                                 decoration: InputDecoration(
-                                  labelText: 'Phone Number',
+                                  labelText: 'Contact Number',
                                   labelStyle: const TextStyle(
                                     color: Colors.black87,
                                     fontFamily: 'PressStart2P',
@@ -980,7 +980,7 @@ Follow these steps to get the embed link from Google Maps:
                                     child: GestureDetector(
                                       onTap: _loading ? null : _showTermsAndConditions,
                                       child: const Text(
-                                        'I agree ta the Terms and Conditions',
+                                        'I agree to the Terms and Conditions',
                                         style: TextStyle(
                                           fontFamily: 'PressStart2P',
                                           fontSize: 14,
