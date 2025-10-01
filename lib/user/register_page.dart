@@ -895,7 +895,7 @@ Follow these steps to get the embed link from Google Maps:
                                 key: Key('contact_number_field'),
                                 controller: _contactController,
                                 decoration: InputDecoration(
-                                  labelText: 'Contact Number',
+                                  labelText: 'Phone Number',
                                   labelStyle: const TextStyle(
                                     color: Colors.black87,
                                     fontFamily: 'PressStart2P',
@@ -927,7 +927,7 @@ Follow these steps to get the embed link from Google Maps:
                                 key: Key('google_maps_field'),
                                 controller: _embedLinkController,
                                 decoration: InputDecoration(
-                                  labelText: 'Google Maps Embed',
+                                  labelText: 'Google Maps Embed Link',
                                   labelStyle: const TextStyle(
                                     color: Colors.black87,
                                     fontFamily: 'PressStart2P',
