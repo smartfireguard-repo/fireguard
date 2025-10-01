@@ -980,7 +980,7 @@ Follow these steps to get the embed link from Google Maps:
                                     child: GestureDetector(
                                       onTap: _loading ? null : _showTermsAndConditions,
                                       child: const Text(
-                                        'I agree to the Terms and Conditions',
+                                        'I agree ta the Terms and Conditions',
                                         style: TextStyle(
                                           fontFamily: 'PressStart2P',
                                           fontSize: 14,
