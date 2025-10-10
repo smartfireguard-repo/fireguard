@@ -33,7 +33,7 @@ jobs:
 
       # Run unit tests
       - name: Run unit tests
-        run: flutter test test/welcome_page_test.dart test/register_page_test.dart test/login_page_test.dart --coverage # Run both test files as separate arguments
+        run: flutter test test/welcome_page_test.dart test/register_page_test.dart test/login_page_test.dart test/main_test.dart --coverage # Run both test files as separate arguments
 
       # Upload coverage to Codecov (optional)
       - name: Upload coverage to Codecov
