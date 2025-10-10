@@ -191,7 +191,7 @@ void onStart(ServiceInstance service) async {
       service.on('setAsBackground').listen((_) => service.setAsBackgroundService());
       await service.setAsForegroundService();
       await service.setForegroundNotificationInfo(
-        title: 'Fireguard Service',
+        title: 'Smart FireGuard Service',
         content: 'Monitoring device status...',
       );
     }
@@ -199,17 +199,6 @@ void onStart(ServiceInstance service) async {
     // Stop handler
     service.on('stopService').listen((_) => service.stopSelf());
 
-    // Periodic task
-    Timer.periodic(const Duration(seconds: 15), (timer) async {
-      print('🔄 [Background] Service running at ${DateTime.now()}');
-      if (service is AndroidServiceInstance && await service.isForegroundService()) {
-        await service.setForegroundNotificationInfo(
-          title: 'Smart Fireguard Service',
-          content: 'Last check at ${DateTime.now()}',
-        );
-      }
-      await prefs.setString('last_active', DateTime.now().toIso8601String());
-    });
   } catch (e, stackTrace) {
     print('🔄 [Background] Error: $e\nStackTrace: $stackTrace');
   }
