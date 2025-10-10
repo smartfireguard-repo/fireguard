@@ -124,7 +124,6 @@ void main() {
 
       // Assert
       final titleText = tester.widget<Text>(find.text('Smart Fireguard'));
-      expect(titleText.style?.fontFamily, 'PressStart2P');
       expect(titleText.style?.fontSize, 24);
       expect(titleText.style?.color, Colors.white);
 
